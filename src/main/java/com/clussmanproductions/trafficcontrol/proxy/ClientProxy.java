@@ -6,9 +6,12 @@ import com.clussmanproductions.trafficcontrol.ModBlocks;
 import com.clussmanproductions.trafficcontrol.ModItems;
 import com.clussmanproductions.trafficcontrol.ModTrafficControl;
 import com.clussmanproductions.trafficcontrol.blocks.BlockLampBase.EnumState;
+import com.clussmanproductions.trafficcontrol.client.TrafficLightFrameBlockColor;
+import com.clussmanproductions.trafficcontrol.client.TrafficLightFrameCompositeBakedModel;
 import com.clussmanproductions.trafficcontrol.network.ServerSideSoundPacket;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.color.BlockColors;
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.block.model.IBakedModel;
@@ -22,6 +25,7 @@ import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
 import net.minecraftforge.client.event.ModelBakeEvent;
 import net.minecraftforge.client.event.ModelRegistryEvent;
+import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.client.model.IModel;
 import net.minecraftforge.client.model.ModelLoader;
 import net.minecraftforge.client.model.ModelLoaderRegistry;
@@ -29,11 +33,14 @@ import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 import net.minecraftforge.fml.common.registry.GameRegistry;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.registries.IForgeRegistry;
+
+import com.google.common.collect.ImmutableSet;
 
 @EventBusSubscriber(Side.CLIENT)
 public class ClientProxy extends CommonProxy {
@@ -53,6 +60,17 @@ public class ClientProxy extends CommonProxy {
 		ModItems.initModels(e);
 	}
 
+	@SubscribeEvent
+	public static void stitchTrafficLightFrameBackTextures(TextureStitchEvent.Pre event) {
+		if (event.getMap() != Minecraft.getMinecraft().getTextureMapBlocks()) {
+			return;
+		}
+		String mod = ModTrafficControl.MODID;
+		event.getMap().registerSprite(new ResourceLocation(mod, "blocks/frame_back_green"));
+		event.getMap().registerSprite(new ResourceLocation(mod, "blocks/frame_back_yellow"));
+		event.getMap().registerSprite(new ResourceLocation(mod, "blocks/frame_back_orange"));
+	}
+
 	@Override
 	public void init(FMLInitializationEvent e) {
 		super.init(e);
@@ -69,9 +87,20 @@ public class ClientProxy extends CommonProxy {
 
 		entityClassRendererKey = new KeyBinding("key.entityclassrenderer.toggle", Keyboard.KEY_RBRACKET, "key.trafficcontrol.category");
 		ClientRegistry.registerKeyBinding(entityClassRendererKey);
+		
+		BlockColors blockColors = Minecraft.getMinecraft().getBlockColors();
+		blockColors.registerBlockColorHandler(TrafficLightFrameBlockColor.INSTANCE,
+				ModBlocks.traffic_light,
+				ModBlocks.traffic_light_1,
+				ModBlocks.traffic_light_2,
+				ModBlocks.traffic_light_4,
+				ModBlocks.traffic_light_5,
+				ModBlocks.traffic_light_5_upper,
+				ModBlocks.traffic_light_6,
+				ModBlocks.traffic_light_doghouse);
 	}
 
-	@SubscribeEvent
+	@SubscribeEvent(priority = EventPriority.LOWEST)
 	public static void bakeModels(ModelBakeEvent e)
 	{
 		bakeModel(e, new ModelResourceLocation(ModTrafficControl.MODID + ":crossing_gate_light", "normal"));
@@ -104,6 +133,34 @@ public class ClientProxy extends CommonProxy {
 //		{
 //			bakeModel(e, new ModelResourceLocation(ModTrafficControl.MODID + ":crossing_gate_lamps_sw_lamp", "state=" + flashState.getName()));
 //		}
+		
+		wrapTrafficLightFrameModels(e);
+	}
+	
+	private static boolean isTrafficLightFrameBlockPath(String path) {
+		if ("traffic_light".equals(path)) {
+			return true;
+		}
+		if ("traffic_light_doghouse".equals(path)) {
+			return true;
+		}
+		return path.matches("traffic_light_[12456]");
+	}
+	
+	private static void wrapTrafficLightFrameModels(ModelBakeEvent e) {
+		for (ModelResourceLocation mrl : ImmutableSet.copyOf(e.getModelRegistry().getKeys())) {
+			if (!ModTrafficControl.MODID.equals(mrl.getResourceDomain())) {
+				continue;
+			}
+			if (!isTrafficLightFrameBlockPath(mrl.getResourcePath())) {
+				continue;
+			}
+			IBakedModel existing = e.getModelRegistry().getObject(mrl);
+			if (existing == null || existing instanceof TrafficLightFrameCompositeBakedModel) {
+				continue;
+			}
+			e.getModelRegistry().putObject(mrl, new TrafficLightFrameCompositeBakedModel(existing));
+		}
 	}
 
 	private static void bakeModel(ModelBakeEvent e, ModelResourceLocation location)

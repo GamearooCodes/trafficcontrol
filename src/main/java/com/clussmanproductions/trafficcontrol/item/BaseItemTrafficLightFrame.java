@@ -8,6 +8,7 @@ import com.clussmanproductions.trafficcontrol.blocks.BlockBaseTrafficLight;
 import com.clussmanproductions.trafficcontrol.tileentity.BaseTrafficLightTileEntity;
 import com.clussmanproductions.trafficcontrol.util.CustomAngleCalculator;
 import com.clussmanproductions.trafficcontrol.util.EnumTrafficLightBulbTypes;
+import com.clussmanproductions.trafficcontrol.util.EnumTrafficLightFrameColor;
 
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
 import net.minecraft.client.util.ITooltipFlag;
@@ -77,6 +78,10 @@ public abstract class BaseItemTrafficLightFrame extends Item {
 		
 		worldIn.setBlockState(pos, getBaseBlockTrafficLight().getDefaultState().withProperty(BlockBaseTrafficLight.ROTATION, CustomAngleCalculator.getRotationForYaw(player.rotationYaw)));
 		BaseTrafficLightTileEntity trafficLight = (BaseTrafficLightTileEntity)worldIn.getTileEntity(pos);
+		if (trafficLight == null)
+		{
+			return EnumActionResult.FAIL;
+		}
 		
 		int bulbCount = getBulbCount();
 		
@@ -104,7 +109,10 @@ public abstract class BaseItemTrafficLightFrame extends Item {
 		trafficLight.setBulbsBySlot(bulbsBySlot);
 		trafficLight.setAllowFlashBySlot(allowFlashBySlot);
 		
-		player.getHeldItemMainhand().shrink(1);
+		EnumTrafficLightFrameColor frameColor = EnumTrafficLightFrameColor.readFromItemTag(heldItem.getTagCompound());
+		trafficLight.setFrameColor(frameColor);
+		
+		player.getHeldItem(hand).shrink(1);
 		
 		return EnumActionResult.SUCCESS;
 	}

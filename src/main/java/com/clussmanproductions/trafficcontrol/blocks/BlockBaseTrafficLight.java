@@ -9,6 +9,8 @@ import com.clussmanproductions.trafficcontrol.item.BaseItemTrafficLightFrame;
 import com.clussmanproductions.trafficcontrol.tileentity.BaseTrafficLightTileEntity;
 import com.clussmanproductions.trafficcontrol.util.CustomAngleCalculator;
 import com.clussmanproductions.trafficcontrol.util.EnumTrafficLightBulbTypes;
+import com.clussmanproductions.trafficcontrol.util.EnumTrafficLightFrameColor;
+import com.clussmanproductions.trafficcontrol.util.TrafficLightFrameProperties;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
@@ -17,6 +19,7 @@ import net.minecraft.block.properties.PropertyInteger;
 import net.minecraft.block.state.BlockFaceShape;
 import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.block.properties.IProperty;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -28,6 +31,9 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
+import net.minecraftforge.common.property.ExtendedBlockState;
+import net.minecraftforge.common.property.IExtendedBlockState;
+import net.minecraftforge.common.property.IUnlistedProperty;
 import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.IItemHandler;
 
@@ -60,7 +66,22 @@ public abstract class BlockBaseTrafficLight extends Block implements IHorizontal
 	
 	@Override
 	protected BlockStateContainer createBlockState() {
-		return new BlockStateContainer(this, ROTATION, VALIDBACKBAR, VALIDHORIZONTALBAR);
+		return new ExtendedBlockState(this,
+				new IProperty<?>[] { ROTATION, VALIDBACKBAR, VALIDHORIZONTALBAR },
+				new IUnlistedProperty<?>[] { TrafficLightFrameProperties.FRAME_COLOR });
+	}
+	
+	@Override
+	public IBlockState getExtendedState(IBlockState state, IBlockAccess world, BlockPos pos) {
+		IExtendedBlockState ext = (IExtendedBlockState) super.getExtendedState(state, world, pos);
+		int ord = EnumTrafficLightFrameColor.BLACK.ordinal();
+		if (world != null && pos != null) {
+			TileEntity te = world.getTileEntity(pos);
+			if (te instanceof BaseTrafficLightTileEntity) {
+				ord = ((BaseTrafficLightTileEntity) te).getFrameColor().ordinal();
+			}
+		}
+		return ext.withProperty(TrafficLightFrameProperties.FRAME_COLOR, ord);
 	}
 	
 	@Override
@@ -160,6 +181,16 @@ public abstract class BlockBaseTrafficLight extends Block implements IHorizontal
 			}
 			
 			stackCompound.setBoolean("always-flash-" + i, trafficLight.getAllowFlashBySlot(i));
+		}
+		
+		EnumTrafficLightFrameColor fc = trafficLight.getFrameColor();
+		if (fc != EnumTrafficLightFrameColor.BLACK)
+		{
+			fc.writeToItemTag(stackCompound);
+		}
+		else
+		{
+			stackCompound.removeTag(EnumTrafficLightFrameColor.NBT_KEY);
 		}
 		
 		frameStack.setTagCompound(frameStack.getItem().getNBTShareTag(frameStack));

@@ -6,6 +6,7 @@ import com.clussmanproductions.trafficcontrol.ModBlocks;
 import com.clussmanproductions.trafficcontrol.ModTrafficControl;
 import com.clussmanproductions.trafficcontrol.blocks.BlockBaseTrafficLight;
 import com.clussmanproductions.trafficcontrol.util.EnumTrafficLightBulbTypes;
+import com.clussmanproductions.trafficcontrol.util.EnumTrafficLightFrameColor;
 
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.passive.EntityPig;
@@ -17,6 +18,7 @@ import net.minecraft.util.ITickable;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
 
 public class BaseTrafficLightTileEntity extends TileEntity implements ITickable {
 
@@ -27,6 +29,7 @@ public class BaseTrafficLightTileEntity extends TileEntity implements ITickable 
 	HashMap<Integer, Integer> flashTimeBySlot = new HashMap<Integer, Integer>();
 	HashMap<Integer, Boolean> flashCurrent = new HashMap<Integer, Boolean>();
 	HashMap<Integer, Boolean> allowFlashBySlot = new HashMap<Integer, Boolean>();
+	private EnumTrafficLightFrameColor frameColor = EnumTrafficLightFrameColor.BLACK;
 	// Easter egg
 	private int isPigAboveDelay;
 	private boolean isPigAbove;
@@ -52,6 +55,7 @@ public class BaseTrafficLightTileEntity extends TileEntity implements ITickable 
 		}
 		
 		compound.setIntArray("bulbTypes", bulbTypes);
+		compound.setByte("frameColor", frameColor.getId());
 		
 		return super.writeToNBT(compound);
 	}
@@ -72,6 +76,8 @@ public class BaseTrafficLightTileEntity extends TileEntity implements ITickable 
 			flashBySlot.put(i, compound.getBoolean("flash" + i));
 			allowFlashBySlot.put(i, compound.hasKey("allowflash" + i) ? compound.getBoolean("allowflash" + i) : true);
 		}
+		
+		frameColor = compound.hasKey("frameColor") ? EnumTrafficLightFrameColor.fromId(compound.getByte("frameColor")) : EnumTrafficLightFrameColor.BLACK;
 	}
 	
 	@Override
@@ -93,6 +99,8 @@ public class BaseTrafficLightTileEntity extends TileEntity implements ITickable 
 			tag.setBoolean("allowflash" + i, getAllowFlashBySlot(i));
 		}
 		
+		tag.setByte("frameColor", frameColor.getId());
+		
 		return tag;
 	}
 	
@@ -112,6 +120,12 @@ public class BaseTrafficLightTileEntity extends TileEntity implements ITickable 
 			activeBySlot.put(i, tag.getBoolean("active" + i));
 			flashBySlot.put(i, tag.getBoolean("flash" + i));
 			allowFlashBySlot.put(i, tag.hasKey("allowflash" + i) ? tag.getBoolean("allowflash" + i) : true);
+		}
+		
+		frameColor = tag.hasKey("frameColor") ? EnumTrafficLightFrameColor.fromId(tag.getByte("frameColor")) : EnumTrafficLightFrameColor.BLACK;
+		
+		if (world != null && world.isRemote && pos != null) {
+			world.markBlockRangeForRenderUpdate(pos.getX(), pos.getY(), pos.getZ(), pos.getX(), pos.getY(), pos.getZ());
 		}
 	}
 	
@@ -239,6 +253,21 @@ public class BaseTrafficLightTileEntity extends TileEntity implements ITickable 
 		}
 		
 		return true;
+	}
+	
+	public EnumTrafficLightFrameColor getFrameColor() {
+		return frameColor;
+	}
+	
+	public void setFrameColor(EnumTrafficLightFrameColor color) {
+		this.frameColor = color != null ? color : EnumTrafficLightFrameColor.BLACK;
+		markDirty();
+		if (world != null && pos != null && !world.isRemote && world instanceof WorldServer) {
+			WorldServer ws = (WorldServer) world;
+			ws.getPlayerChunkMap().markBlockForUpdate(pos);
+			IBlockState st = world.getBlockState(pos);
+			world.notifyBlockUpdate(pos, st, st, 3);
+		}
 	}
 	
 	public boolean anyActive()
